@@ -1,0 +1,12 @@
+Flask
+aiohttp
+numpy
+pandas
+plotly
+statsmodels
+scikit-learn
+optuna
+xgboost
+lightgbm
+torch
+prophet
