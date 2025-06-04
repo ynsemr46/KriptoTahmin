@@ -30,7 +30,6 @@ except ImportError:
 import aiohttp
 import asyncio
 import sqlite3
-import optuna
 import json
 try:
     import tensorflow as tf
@@ -260,27 +259,6 @@ def prophet_forecast(df, steps=30):
     index = pd.date_range(df.index[-1] + pd.Timedelta(days=1), periods=steps, freq='D')
     return pd.Series(pred_uc, index=index), pd.DataFrame(pred_ci, index=index, columns=['lower', 'upper'])
 
-def optimize_xgboost(df):
-    def objective(trial):
-        params = {
-            'n_estimators': trial.suggest_int('n_estimators', 50, 300),
-            'max_depth': trial.suggest_int('max_depth', 3, 12),
-            'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
-            'subsample': trial.suggest_float('subsample', 0.6, 1.0),
-            'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0)
-        }
-        df_feat = create_features(df, lags=14)
-        train_size = int(0.8 * len(df_feat))
-        X_train, X_val = df_feat.drop('price', axis=1).iloc[:train_size], df_feat.drop('price', axis=1).iloc[train_size:]
-        y_train, y_val = df_feat['price'].iloc[:train_size], df_feat['price'].iloc[train_size:]
-        model = xgb.XGBRegressor(**params)
-        model.fit(X_train, y_train)
-        y_pred = model.predict(X_val)
-        return mean_squared_error(y_val, y_pred, squared=False)
-    study = optuna.create_study(direction='minimize')
-    study.optimize(objective, n_trials=50)
-    return study.best_params
-
 def scale_series(series):
     min_val = series.min()
     max_val = series.max()
@@ -368,10 +346,11 @@ def lstm_forecast(df, steps=30):
     loss_fn = nn.MSELoss()
     model.train()
     dataset = torch.utils.data.TensorDataset(X, y)
-    loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=True)
+    # Reduce batch_size and epochs for memory
+    loader = torch.utils.data.DataLoader(dataset, batch_size=16, shuffle=True)
     best_loss = float('inf')
-    patience, trials = 5, 0
-    for epoch in range(50):
+    patience, trials = 3, 0
+    for epoch in range(20):
         epoch_loss = 0
         for X_batch, y_batch in loader:
             optimizer.zero_grad()
@@ -420,7 +399,6 @@ def tensorflow_forecast(df, steps=30):
     y_train, y_val = y[:train_size], y[train_size:]
 
     from keras import Input
-    # Düzgün Sequential model (Attention ve LayerNormalization çıkarıldı)
     model = Sequential([
         Input(shape=(lags, 1)),
         LSTM(128, return_sequences=True),
@@ -431,8 +409,9 @@ def tensorflow_forecast(df, steps=30):
         Dense(1)
     ])
     model.compile(optimizer=Adam(learning_rate=0.001), loss='mse')
-    model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=50, batch_size=32, verbose=0,
-              callbacks=[tf.keras.callbacks.EarlyStopping(patience=5, restore_best_weights=True)])
+    # Reduce epochs and batch_size for memory
+    model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=20, batch_size=16, verbose=0,
+              callbacks=[tf.keras.callbacks.EarlyStopping(patience=3, restore_best_weights=True)])
 
     last_seq = data[-lags:].reshape(1, lags, 1)
     preds = []
