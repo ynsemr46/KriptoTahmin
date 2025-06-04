@@ -1,4 +1,3 @@
-import requests
 import pandas as pd
 import numpy as np
 from statsmodels.tsa.statespace.sarimax import SARIMAX
