@@ -300,7 +300,14 @@ def xgboost_forecast(df, steps=30):
     df_feat_scaled['price'] = scaled_price
     X = df_feat_scaled.drop('price', axis=1).values
     y = df_feat_scaled['price'].values
-    params = optimize_xgboost(df)
+    # Use static/default parameters instead of optimize_xgboost
+    params = {
+        'n_estimators': 100,
+        'max_depth': 6,
+        'learning_rate': 0.1,
+        'subsample': 0.8,
+        'colsample_bytree': 0.8
+    }
     model = xgb.XGBRegressor(**params)
     model.fit(X, y)
     last_row = df_feat_scaled.iloc[-1].copy()
