@@ -32,11 +32,12 @@ import asyncio
 import sqlite3
 import json
 try:
-    import tensorflow as tf
-    from keras.models import Sequential
-    from keras.layers import LSTM, Dense, Dropout, Attention, LayerNormalization
-    from keras.optimizers import Adam
-    has_tf = True
+    # TensorFlow'u pasif hale getiriyoruz
+    # import tensorflow as tf
+    # from keras.models import Sequential
+    # from keras.layers import LSTM, Dense, Dropout, Attention, LayerNormalization
+    # from keras.optimizers import Adam
+    has_tf = False
 except ImportError:
     has_tf = False
 try:
@@ -383,50 +384,7 @@ def lstm_forecast(df, steps=30):
     return pred_uc, pred_ci
 
 def tensorflow_forecast(df, steps=30):
-    if not has_tf:
-        raise ImportError("TensorFlow yüklü değil.")
-    lags = 14
-    scaled_price, min_val, max_val = scale_series(df['price'])
-    data = scaled_price.values.astype(np.float32)
-    X, y = [], []
-    for i in range(lags, len(data)):
-        X.append(data[i-lags:i])
-        y.append(data[i])
-    X = np.array(X).reshape(-1, lags, 1)
-    y = np.array(y)
-    train_size = int(0.8 * len(X))
-    X_train, X_val = X[:train_size], X[train_size:]
-    y_train, y_val = y[:train_size], y[train_size:]
-
-    from keras import Input
-    model = Sequential([
-        Input(shape=(lags, 1)),
-        LSTM(128, return_sequences=True),
-        Dropout(0.3),
-        LSTM(64, return_sequences=False),
-        Dropout(0.3),
-        Dense(16, activation='relu'),
-        Dense(1)
-    ])
-    model.compile(optimizer=Adam(learning_rate=0.001), loss='mse')
-    # Reduce epochs and batch_size for memory
-    model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=20, batch_size=16, verbose=0,
-              callbacks=[tf.keras.callbacks.EarlyStopping(patience=3, restore_best_weights=True)])
-
-    last_seq = data[-lags:].reshape(1, lags, 1)
-    preds = []
-    for _ in range(steps):
-        pred_scaled = model.predict(last_seq, verbose=0)[0, 0]
-        pred = inverse_scale(pred_scaled, min_val, max_val)
-        pred = max(pred, 0)
-        preds.append(pred)
-        last_seq = np.roll(last_seq, -1, axis=1)
-        last_seq[0, -1, 0] = pred_scaled
-
-    index = pd.date_range(df.index[-1] + pd.Timedelta(days=1), periods=steps, freq='D')
-    pred_uc = pd.Series(preds, index=index)
-    pred_ci = pd.DataFrame({'lower': pred_uc * 0.95, 'upper': pred_uc * 1.05}, index=index)
-    return pred_uc, pred_ci
+    raise ImportError("TensorFlow pasif hale getirildi.")
 
 def compute_model_weights(df, models):
     weights = {}
@@ -759,9 +717,10 @@ def index():
                     {% if has_torch %}
                     <option value="lstm" {% if selected_model=='lstm' %}selected{% endif %}>LSTM</option>
                     {% endif %}
-                    {% if has_tf %}
-                    <option value="tensorflow" {% if selected_model=='tensorflow' %}selected{% endif %}>TensorFlow</option>
-                    {% endif %}
+                    {# TensorFlow seçeneğini tamamen kaldırdık #}
+                    {# {% if has_tf %} #}
+                    {# <option value="tensorflow" {% if selected_model=='tensorflow' %}selected{% endif %}>TensorFlow</option> #}
+                    {# {% endif %} #}
                     <option value="ensemble" {% if selected_model=='ensemble' %}selected{% endif %}>Tüm Modeller (Ensemble)</option>
                 </select>
                 <label for="days">Gün:</label>
