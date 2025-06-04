@@ -1,9 +1,0 @@
-services:
-  - type: web
-    name: KriptoTahmin
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python tahmin.py
-    disk:
-      - name: cache
-        mountPath: /var/cache
